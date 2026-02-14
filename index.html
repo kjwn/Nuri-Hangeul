@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Nuri Hangeul Global IME</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: radial-gradient(circle at top, #e8f0ff 0, #f5f5f5 55%, #e0e0e0 100%);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: #222;
+    }
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      background: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.16);
+      padding: 20px 24px 24px;
+    }
+    .app-header {
+      border-bottom: 1px solid #ececec;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .app-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+    .app-subtitle {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #666;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #888;
+      background: #ffffff;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
+    }
+    button.primary {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+      box-shadow: 0 2px 6px rgba(37,99,235,0.35);
+    }
+    button.primary:hover {
+      background: #1d4ed8;
+      box-shadow: 0 3px 10px rgba(37,99,235,0.45);
+      transform: translateY(-1px);
+    }
+    button:hover {
+      background: #f3f4f6;
+    }
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+    .file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px dashed #999;
+      cursor: pointer;
+      background: #fafafa;
+    }
+    .file-label:hover {
+      background: #f3f4f6;
+    }
+    .file-label input[type="file"] {
+      display: none;
+    }
+    .toolbar-spacer {
+      flex: 1;
+    }
+    .status {
+      font-size: 12px;
+      color: #555;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      min-width: 210px;
+    }
+    .status-line {
+      line-height: 1.3;
+    }
+    .canvas-wrapper {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e0e0e0;
+      background: #fff;
+    }
+    canvas {
+      display: block;
+      background: white;
+      cursor: crosshair;
+    }
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #777;
+    }
+    #ime {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <h1 class="app-title">Nuri Hangeul Global IME</h1>
+    <p class="app-subtitle">
+      캔버스를 클릭해 기준점을 정하고, 키보드로 낱글자를 찍은 뒤 JSON으로 저장/불러오기 할 수 있습니다. 워드 문서에서 작성한 것을 복사해서 붙여도 됩니다. <br>
+	  오른쪽 아래에 있는 <b>음성 입력</b>의 <b>시작</b> 단추를 누르면 마이크를 통해서 여러 언어를 입력할 수 있습니다. <br>
+	  [주의] 이 글자들은 텍스트처럼 보이지만 실제로는 이미지 모음입니다.
+     <br>
+	  <span style="color:#444;">티베트어(བོད་སྐད།)는 키보드 입력으로 사용 가능합니다.</span>
+    </p>
+  </header>
+
+  <div class="toolbar">
+    <button id="newBtn" title="모든 글자를 지우고 새로 시작합니다.">
+      🧹 새 캔버스
+    </button>
+    <button id="saveBtn" class="primary" title="현재 배치를 JSON 파일로 저장합니다.">
+      💾 JSON 저장
+    </button>
+    <label class="file-label" title="저장해 둔 JSON을 불러와서 다시 편집합니다.">
+	   📂 JSON 불러오기
+      <input type="file" id="loadInput" accept=".json,application/json">
+    </label>
+    <label class="file-label" title="TXT(탭 구분) 파일을 불러와서 캔버스에 복원합니다.">
+      📄 TXT 불러오기
+      <input type="file" id="loadTxtInput" accept=".txt,text/plain">
+    </label>
+	<button id="saveJpgBtn" title="현재 화면을 JPG 이미지로 저장합니다.">
+  🖼 JPG 저장
+</button>
+
+    <button id="font50Btn" title="입력 글자 크기: 50px (새로 입력되는 글자에 적용)">A50</button>
+    <button id="font25Btn" title="입력 글자 크기: 25px (새로 입력되는 글자에 적용)">A25</button>
+
+    <button id="undoBtn" title="Ctrl+Z와 같습니다. 직전 상태로 되돌립니다.">
+      ↩️ 되돌리기
+    </button>
+
+    <div class="toolbar-spacer"></div>
+
+    <div class="status">
+      <div class="status-line" id="statusChars">글자: 0개</div>
+      <div class="status-line" id="statusPos">입력 위치: 없음</div>
+            <div class="status-line" id="statusFont">폰트: 50px</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas" width="1000" height="180" tabindex="0"></canvas>
+  </div>
+  
+  <!-- ========================= -->
+<!-- 옛한글 낱글자 팔레트 -->
+<!-- ========================= -->
+<div class="palette">
+  <button class="jamo-btn" data-char="ㅿ">ㅿ</button>
+  <button class="jamo-btn" data-char="ㆆ">ㆆ</button>
+  <button class="jamo-btn" data-char="ㆁ">ㆁ</button>
+  <button class="jamo-btn" data-char="ㅸ">ㅸ</button>
+  <button class="jamo-btn" data-char="ㅹ">ㅹ</button>
+  <button class="jamo-btn" data-char="ㆄ">ㆄ</button>
+  <button class="jamo-btn" data-char="ㅱ">ㅱ</button>
+  <button class="jamo-btn" data-char="ᄛ">ᄛ</button>
+  <button class="jamo-btn" data-char="˚">˚</button>
+  <button class="jamo-btn" data-char="ˇ">ˇ</button>
+  <button class="jamo-btn" data-char="´">´</button>
+  <button class="jamo-btn" data-char="`">`</button>
+  <button class="jamo-btn" data-char="ᄼ">ᄼ</button>
+  <button class="jamo-btn" data-char="ᅎ">ᅎ</button>
+  <button class="jamo-btn" data-char="ᅔ">ᅔ</button>
+</div>
+
+
+  <p class="hint">
+    사용법: (1) 캔버스를 클릭해 입력 위치를 정합니다. (2) 한글/영문을 입력하면 해당 위치에 글자가 찍히고 오른쪽으로 이동합니다. 
+	(3) 글자의 크기는 <b>A50</b>과 <b>A25</b> 중에서 고르세요. (4) 누리한글에서 필요한 <b>옛글자</b>는 캔버스의 아래쪽에 있는 단추를 눌러서 입력합니다. 
+    (5) 잘못 입력했으면 <b>Backspace</b>로 마지막 글자를 지울 수 있고, <b>Ctrl+Z</b>로 이전 상태로 되돌릴 수 있습니다.
+  </p>
+</div>
+
+<input id="ime" autocomplete="off" />
+
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const ime = document.getElementById("ime");
+  // -------------------------
+  // Keyboard 입력 안정화
+  // -------------------------
+  canvas.tabIndex = 0;
+
+  let imeComposing = false;
+
+  function ensureIMEFocus() {
+    try { ime.focus({ preventScroll: true }); } catch(e) { try { ime.focus(); } catch(_) {} }
+  }
+
+  // IME 조합 상태 추적 (한글/일본어/중국어 등)
+  ime.addEventListener("compositionstart", () => { imeComposing = true; });
+  ime.addEventListener("compositionend", (e) => {
+    imeComposing = false;
+    // 한글 등 IME 조합이 "확정"되는 시점에 캔버스로 반영
+    const v = (e && typeof e.data === "string" && e.data) ? e.data : (ime.value || "");
+    if (v && v.trim() !== "") {
+      insertTextToCanvas(v);
+      ime.value = "";
+    }
+  });
+
+  const saveBtn = document.getElementById("saveBtn");
+  const loadInput = document.getElementById("loadInput");
+  const newBtn = document.getElementById("newBtn");
+  const undoBtn = document.getElementById("undoBtn");
+
+  const font50Btn = document.getElementById("font50Btn");
+  const font25Btn = document.getElementById("font25Btn");
+  const statusChars = document.getElementById("statusChars");
+  const statusPos = document.getElementById("statusPos");
+
+  
+  const statusFont = document.getElementById("statusFont");
+const w = canvas.width;
+  const h = canvas.height;
+
+  // -------------------------
+  // 1. 눈금 그리기
+  // -------------------------
+  function drawGrid(step) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+
+    for (let x = 0; x <= w; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.strokeStyle = (x % 50 === 0) ? "#d1d5db" : "#e5e7eb";
+      ctx.lineWidth = (x % 50 === 0) ? 1.2 : 0.6;
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.strokeStyle = (y % 50 === 0) ? "#d1d5db" : "#e5e7eb";
+      ctx.lineWidth = (y % 50 === 0) ? 1.2 : 0.6;
+      ctx.stroke();
+    }
+  }
+
+  drawGrid(5);
+
+  // -------------------------
+  // 2. 글자 배치 데이터 구조 + 히스토리
+  // -------------------------
+  let placedChars = [];   // {char, x, y}
+  let currentPos = null;  // {x, y}
+
+  // 간단한 undo 스택 (이전 상태 저장)
+  let historyStack = [];
+
+  const korFont = "'이사만루', 'Apple SD Gothic Neo', 'Noto Sans KR Black', 'Noto Sans KR', 'Noto Sans', 'Noto Sans Arabic', 'Noto Naskh Arabic', 'Noto Sans Devanagari', 'Mangal', 'Noto Sans Ethiopic', 'Noto Sans Cherokee', 'Noto Sans Adlam', 'Noto Sans Tagalog', 'Segoe UI', system-ui, sans-serif";
+  ctx.textAlign = "center";
+
+  let currentFontSize = 50; // 50px / 25px 전환 (새로 입력되는 글자에 적용)
+
+  function advanceX(sizePx) {
+    // 글자 폭 추정: 폰트 크기의 약 0.6배
+    return Math.max(8, Math.round(sizePx * 1.0));
+  }
+
+  ctx.textBaseline = "middle";
+
+  // -------------------------
+  // STT/붙여넣기/키입력 공통: 자동 줄바꿈 기준
+  // -------------------------
+  const WRAP_X = 900;       // x가 이 값을 넘으면 다음 줄로 이동
+  const WRAP_START_X = 50; // 줄바꿈 후 시작 x(왼쪽 여백)
+  const LEFT_MARGIN = WRAP_START_X; // 모든 행의 시작 x (왼쪽 여백)
+  const LINE_GAP = 1.4;    // 줄 간격(폰트 크기 배수)
+
+
+  // -------------------------
+  // 2-5. RTL/Complex script helpers (Arabic / Devanagari)
+  // - Canvas는 문자열 전체를 fillText할 때 결합/셰이핑이 훨씬 잘 됩니다.
+  // - 아랍어는 RTL 방향 + 오른쪽 정렬로 그립니다.
+  // -------------------------
+  function getVoiceLang() {
+    const sel = document.getElementById("voiceLang");
+    return sel ? sel.value : "";
+  }
+
+  function hasArabic(text) {
+    return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+  }
+
+  function hasDevanagari(text) {
+    return /[\u0900-\u097F]/.test(text);
+  }
+
+  
+
+  function hasThai(text) {
+    return /[\u0E00-\u0E7F]/.test(text);
+  }
+
+  function hasLao(text) {
+    return /[\u0E80-\u0EFF]/.test(text);
+  }
+
+  function hasKhmer(text) {
+    return /[\u1780-\u17FF]/.test(text);
+  }
+
+  function hasMyanmar(text) {
+    return /[\u1000-\u109F\uAA60-\uAA7F]/.test(text);
+  }
+
+  // 데바나가리(힌디어/네팔어) + 태국어 + 라오어 + 크메르어 + 미얀마어
+  function hasComplexScript(text) {
+    return hasDevanagari(text) || hasThai(text) || hasLao(text) || hasKhmer(text) || hasMyanmar(text);
+  }
+function isRTLText(text) {
+    return getVoiceLang() === "ar-SA" || hasArabic(text);
+  }
+
+  function snap5(n) { return Math.round(n / 5) * 5; }
+
+  function measureTextWidth(text, size) {
+    ctx.save();
+    ctx.font = size + "px " + korFont;
+    const w = ctx.measureText(text).width;
+    ctx.restore();
+    return w;
+  }
+
+
+  // 상태 깊은 복사
+  function cloneState() {
+    return {
+      placedChars: placedChars.map(c => ({ char: c.char, x: c.x, y: c.y, size: c.size, run: !!c.run, dir: c.dir })),
+      currentPos: currentPos ? { x: currentPos.x, y: currentPos.y } : null
+    };
+  }
+
+  function pushHistory() {
+    historyStack.push(cloneState());
+    // 너무 길어지지 않도록 최대 100단계까지만 유지
+    if (historyStack.length > 100) {
+      historyStack.shift();
+    }
+  }
+
+  function undo() {
+    if (historyStack.length === 0) return;
+    const prev = historyStack.pop();
+    placedChars = prev.placedChars;
+    currentPos = prev.currentPos;
+    redraw();
+  }
+
+  // -------------------------
+  // 상태 표시 업데이트
+  // -------------------------
+  function updateStatus() {
+    statusChars.textContent = "글자: " + placedChars.length + "개";
+    if (currentPos) {
+      statusPos.textContent = "입력 위치: x=" + currentPos.x + ", y=" + currentPos.y;
+    } else {
+      statusPos.textContent = "입력 위치: 없음";
+    }
+
+    statusFont.textContent = "폰트: " + currentFontSize + "px";
+  }
+
+  // -------------------------
+  // 3. 전체 다시 그리기
+  // -------------------------
+  function redraw() {
+    drawGrid(5);
+
+    ctx.fillStyle = "#000000";
+    placedChars.forEach(c => {
+      const size = (typeof c.size === "number") ? c.size : currentFontSize;
+      ctx.font = size + "px " + korFont;
+
+      if (c && c.run) {
+        ctx.save();
+        const rtl = (c.dir === "rtl") || isRTLText(String(c.char || ""));
+        ctx.direction = rtl ? "rtl" : "ltr";
+        ctx.textAlign = rtl ? "right" : "left";
+        ctx.fillText(String(c.char || ""), c.x, c.y);
+        ctx.restore();
+      } else {
+        ctx.textAlign = "center";
+        ctx.direction = "ltr";
+        ctx.fillText(c.char, c.x, c.y);
+      }
+    });
+
+    if (currentPos) {
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    updateStatus();
+  }
+
+  // -------------------------
+  // 4. 마우스 클릭으로 위치 선택
+  // -------------------------
+  function getCanvasPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    return { x, y };
+  }
+
+  const appRoot = document.querySelector(".app");
+  if (appRoot) {
+    appRoot.addEventListener("mousedown", (e) => {
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+      if (tag === "select" || tag === "option" || tag === "button" || tag === "input" || tag === "textarea" || tag === "label") return;
+      ensureIMEFocus();
+    });
+  }
+
+  canvas.addEventListener("click", (evt) => {
+    const pos = getCanvasPos(evt);
+
+    const gridX = Math.round(pos.x / 5) * 5;
+    const gridY = Math.round(pos.y / 5) * 5;
+
+    currentPos = { x: gridX, y: gridY };
+
+    ime.value = "";
+    ensureIMEFocus();
+
+    redraw();
+  });
+
+  // -------------------------
+  // 5-1. IME 조합 완료 (한글 등)
+  // -------------------------
+  ime.addEventListener("compositionend", (evt) => {
+    if (!currentPos) return;
+    const text = evt.data;
+    if (!text) return;
+
+    pushHistory();
+
+    const rtl = isRTLText(text);
+    const complex = rtl || hasComplexScript(text);
+
+    if (complex) {
+      const width = measureTextWidth(text, currentFontSize);
+
+      placedChars.push({
+        char: text,
+        x: currentPos.x,
+        y: currentPos.y,
+        size: currentFontSize,
+        run: true,
+        dir: rtl ? "rtl" : "ltr"
+      });
+
+      currentPos = {
+        x: rtl ? (currentPos.x - width) : (currentPos.x + width),
+        y: currentPos.y
+      };
+
+      ime.value = "";
+      redraw();
+      return;
+    }
+  });
+// -------------------------
+  // 붙여넣기용 텍스트 삽입 함수
+  // - STT(음성 인식) / 붙여넣기 / 기타 호출이 모두 이 함수를 사용합니다.
+  // - x=WRAP_X를 넘으면 자동으로 다음 줄로 이동합니다.
+  // -------------------------
+  function insertTextToCanvas(text) {
+    if (!currentPos || !text) return;
+
+    pushHistory();
+
+    const rtl = isRTLText(text);
+    const complex = rtl || hasComplexScript(text);
+
+    // === run 단위(아랍어·데바나가리·태국어·라오·크메르·미얀마 등) ===
+    if (complex) {
+      const width = measureTextWidth(text, currentFontSize);
+
+      // ✅ LTR일 때만 자동 줄바꿈 적용 (RTL은 오른쪽으로 진행)
+      if (!rtl && currentPos.x + width > WRAP_X) {
+        currentPos = { x: snap5(Math.max(WRAP_START_X, LEFT_MARGIN)), y: snap5(currentPos.y + currentFontSize * LINE_GAP) };
+      }
+
+      placedChars.push({
+        char: text,
+        x: currentPos.x,
+        y: currentPos.y,
+        size: currentFontSize,
+        run: true,
+        dir: rtl ? "rtl" : "ltr"
+      });
+
+      currentPos = {
+        x: rtl ? (currentPos.x - width) : (currentPos.x + width),
+        y: currentPos.y
+      };
+
+      redraw();
+      ime.value = "";
+      ime.focus();
+      return;
+    }
+
+    // === 일반 문자 단위 ===
+    for (const ch of text) {
+      const adv = advanceX(currentFontSize);
+
+      // ✅ 자동 줄바꿈
+      if (currentPos.x + adv > WRAP_X) {
+        currentPos = {
+          x: snap5(LEFT_MARGIN),
+          y: snap5(currentPos.y + currentFontSize * LINE_GAP)
+        };
+      }
+
+      placedChars.push({
+        char: ch,
+        x: currentPos.x,
+        y: currentPos.y,
+        size: currentFontSize
+      });
+
+      currentPos = {
+        x: currentPos.x + adv,
+        y: currentPos.y
+      };
+    }
+
+    redraw();
+    ime.value = "";
+    ime.focus();
+  }
+
+
+// =========================
+// 옛한글 팔레트 버튼 처리
+// =========================
+document.querySelectorAll(".jamo-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const ch = btn.dataset.char;
+    if (!currentPos) return;
+
+    pushHistory();
+
+    placedChars.push({
+      char: ch,
+      x: currentPos.x,
+      y: currentPos.y,
+      size: currentFontSize
+    });
+
+    currentPos = {
+      x: currentPos.x + advanceX(currentFontSize),
+      y: currentPos.y
+    };
+
+    redraw();
+    ime.focus();
+  });
+});
+
+
+  // -------------------------
+  // Ctrl+V 붙여넣기 처리
+  // -------------------------
+  ime.addEventListener("paste", (evt) => {
+    const text = (evt.clipboardData || window.clipboardData).getData("text");
+    if (!text) return;
+
+    evt.preventDefault();   // input에 붙지 않게
+    insertTextToCanvas(text);
+  });
+
+
+  // -------------------------
+  // 5-2. IME 안 쓰는 경우(영어, 숫자 등) + Undo/Backspace 처리
+  // -------------------------
+  
+  function keyHandler(evt) {
+    // IME(한글/일본어/중국어 등) 조합 입력은 브라우저에 맡깁니다.
+    // - keyCode 229(IME), isComposing, 또는 숨김 IME 입력창(#ime) 대상 이벤트는 가로채지 않음
+    if (evt && (evt.isComposing || evt.keyCode === 229 || imeComposing)) return;
+
+// ============================
+    // 화살표 키로 빨간 점(입력 위치) 이동
+    // - 스냅 간격: 5px (현재 눈금/스냅과 동일)
+    // ============================
+    const step = 5;
+    if (evt.key === "ArrowLeft" || evt.key === "ArrowRight" || evt.key === "ArrowUp" || evt.key === "ArrowDown") {
+      evt.preventDefault(); // 화면 스크롤 방지
+
+      // 아직 위치를 찍지 않았으면 (0,0)에서 시작
+      if (!currentPos) currentPos = { x: 0, y: 0 };
+
+      if (evt.key === "ArrowLeft")  currentPos.x -= step;
+      if (evt.key === "ArrowRight") currentPos.x += step;
+      if (evt.key === "ArrowUp")    currentPos.y -= step;
+      if (evt.key === "ArrowDown")  currentPos.y += step;
+
+      // 캔버스 밖으로 나가지 않게 클램프
+      currentPos.x = Math.max(0, Math.min(w, currentPos.x));
+      currentPos.y = Math.max(0, Math.min(h, currentPos.y));
+
+      redraw();
+      ime.focus(); // IME(한글 입력) 포커스 유지
+      return;
+    }
+
+
+    // Ctrl+Z 되돌리기
+    if (evt.ctrlKey && (evt.key === "z" || evt.key === "Z")) {
+      evt.preventDefault();
+      undo();
+      return;
+    }
+
+    // Ctrl+1 / Ctrl+2 : "마지막 글자"만 크기 변경 (개별 글자 크기 지원)
+    if (evt.ctrlKey && (evt.key === "1" || evt.key === "2")) {
+      evt.preventDefault();
+      if (placedChars.length === 0) return;
+      pushHistory();
+      const newSize = (evt.key === "1") ? 50 : 25;
+      placedChars[placedChars.length - 1].size = newSize;
+      redraw();
+      return;
+    }
+
+    // ============================
+    // Ctrl+V / Cmd+V : 붙여넣기
+    // - 'v'가 문자로 찍히는 것을 방지
+    // - 실제 텍스트는 paste 이벤트에서 처리
+    // ============================
+    if ((evt.ctrlKey || evt.metaKey) && (evt.key === "v" || evt.key === "V")) {
+      ime.focus();
+      return;
+    }
+
+
+    // Backspace: 마지막 글자 삭제
+    if (evt.key === "Backspace") {
+      evt.preventDefault();
+      if (placedChars.length === 0) return;
+
+      // 현재 상태 저장 후 마지막 글자 제거
+      pushHistory();
+      const removed = placedChars.pop();
+      // 삭제한 글자 위치를 현재 입력 위치로 되돌림
+      currentPos = { x: removed.x, y: removed.y };
+      redraw();
+      return;
+    }
+
+    if (evt.isComposing || evt.key === "Process") return;
+    if (!currentPos) return;
+
+    const ch = evt.key;
+    if (!ch || ch.length !== 1) return;
+
+    // 일반 글자 입력 전 상태 저장
+    pushHistory();
+
+    // keydown으로 처리하므로, 숨김 IME input에 문자가 남지 않게 기본 동작을 막습니다.
+    evt.preventDefault();
+
+    
+    // 일반 글자 입력 전 상태 저장
+    pushHistory();
+
+    placedChars.push({
+      char: ch,
+      x: currentPos.x,
+      y: currentPos.y,
+      size: currentFontSize
+    });
+
+    currentPos = { x: currentPos.x + advanceX(currentFontSize), y: currentPos.y };
+    redraw();
+  }
+
+  // 키보드 입력이 UI(드롭다운/버튼) 포커스 때문에 끊기는 것을 방지하기 위해
+  // window 캡처 단계에서도 함께 수신합니다.
+  window.addEventListener("keydown", keyHandler, true);
+  // -------------------------
+  // 6. 새 캔버스 (초기화)
+  // -------------------------
+  function clearCanvasData() {
+    placedChars = [];
+    currentPos = null;
+    historyStack = [];
+    redraw();
+  }
+
+  newBtn.addEventListener("click", clearCanvasData);
+  undoBtn.addEventListener("click", undo);
+
+  // 폰트 크기(새 입력 글자에 적용)
+  font50Btn.addEventListener("click", () => {
+    currentFontSize = 50;
+    redraw();
+	ime.focus();   // ⭐ 한글 입력 복구 핵심
+  });
+  font25Btn.addEventListener("click", () => {
+    currentFontSize = 25;
+    redraw();
+	ime.focus();   // ⭐ 한글 입력 복구 핵심
+  });
+
+// -------------------------
+  // 7. JSON 저장
+  // -------------------------
+  async function saveJSON() {
+  // ⚠️ 파일 저장 대화상자(showSaveFilePicker)는 보통 localhost/HTTPS에서만 안정적으로 동작합니다.
+  // file:// 로 직접 열었으면 다운로드(폴백)로 저장됩니다.
+  // 1) JSON 내용 만들기
+  const data = {
+    placedChars,
+    currentFontSize,
+    paperType: (typeof paperType !== "undefined") ? paperType : null
+  };
+  const jsonString = JSON.stringify(data, null, 2);
+
+  // 기본 제안 파일명(자동번호 대신 "제안"만)
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const suggested =
+    "nuri_" +
+    d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "_" +
+    pad(d.getHours()) + pad(d.getMinutes()) +
+    ".json";
+
+  // ✅ Chrome/Edge: 폴더 선택 + 파일명 변경 가능한 저장 대화상자
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{
+          description: "JSON",
+          accept: { "application/json": [".json"] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(jsonString);
+      await writable.close();
+    } catch (err) {
+      // 사용자가 취소하면 아무 것도 하지 않음
+      console.warn("Save canceled/failed:", err);
+      return;
+    }
+  } else {
+    // 🔁 fallback: 미지원 브라우저는 파일명만 물어보고 다운로드
+    const filename = prompt("저장할 파일 이름을 입력하세요 (.json 포함)", suggested) || suggested;
+    const jsonBlob = new Blob([jsonString], { type: "application/json" });
+    const jsonUrl = URL.createObjectURL(jsonBlob);
+
+    const a = document.createElement("a");
+    a.href = jsonUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(jsonUrl), 1000);
+  }
+
+  // 2) 저장 후 캔버스 비우기
+  clearCanvasData();
+}
+
+
+  saveBtn.addEventListener("click", saveJSON);
+
+const saveJpgBtn = document.getElementById("saveJpgBtn");
+
+function saveJPG() {
+  // 저장 전 빨간 점을 잠시 숨기고 캔버스를 다시 그림
+  const savedPos = currentPos;
+  currentPos = null;
+  redraw();
+
+  // JPG 데이터 생성
+  const dataURL = canvas.toDataURL("image/jpeg", 0.95);  // 95% 품질
+
+  // 다시 빨간 점 복구
+  currentPos = savedPos;
+  redraw();
+
+  // Blob 변환
+  const byteString = atob(dataURL.split(",")[1]);
+  const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
+  const buffer = new ArrayBuffer(byteString.length);
+  const dataArray = new Uint8Array(buffer);
+
+  for (let i = 0; i < byteString.length; i++) {
+    dataArray[i] = byteString.charCodeAt(i);
+  }
+
+  const blob = new Blob([buffer], { type: mimeString });
+  const url = URL.createObjectURL(blob);
+
+  // 다운로드
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "drawing_canvas.jpg";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+saveJpgBtn.addEventListener("click", saveJPG);
+
+ // -------------------------
+  // 8-0. TXT 불러오기 + 복원 (탭 구분: char\tx\ty\tsize[optional])
+  // -------------------------
+  loadTxtInput.addEventListener("change", () => {
+    const file = loadTxtInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = String(e.target.result || "");
+        const lines = text.replace(/\r\n?/g, "\n").split("\n");
+
+        const newChars = [];
+        let posFromTxt = null;
+        for (const line of lines) {
+          if (!line.trim() && line !== "\t\t" && line !== "\t\t\t") continue; // 빈 줄 스킵
+
+          // 탭 기준 분리 (저장 형식: char\tx\ty\tsize)
+          const parts = line.split("\t");
+
+          // #POS\tx\ty 형식이면 현재 입력 위치로 해석
+          if (parts[0] === "#POS") {
+            const px = Number(parts[1]);
+            const py = Number(parts[2]);
+            if (Number.isFinite(px) && Number.isFinite(py)) {
+              posFromTxt = { x: px, y: py };
+            }
+            continue;
+          }
+
+          // parts[0]가 빈 문자열이면 "공백" 글자로 취급
+          const ch = (parts[0] === undefined) ? "" : (parts[0] === "" ? " " : parts[0]);
+
+          const x = Number(parts[1]);
+          const y = Number(parts[2]);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+          const sizeRaw = parts[3];
+          const size = (sizeRaw !== undefined && String(sizeRaw).trim() !== "") ? Number(sizeRaw) : currentFontSize;
+          newChars.push({
+            char: ch,
+            x,
+            y,
+            size: Number.isFinite(size) ? size : currentFontSize
+          });
+        }
+
+        placedChars = newChars;
+
+        // currentPos 복원: TXT에 #POS가 있으면 그 값을 사용, 없으면 "마지막 글자 다음 위치"로 계산
+        if (posFromTxt) {
+          currentPos = posFromTxt;
+        } else if (placedChars.length > 0) {
+          const last = placedChars[placedChars.length - 1];
+          const lastSize = (typeof last.size === "number") ? last.size : currentFontSize;
+          currentPos = { x: last.x + advanceX(lastSize), y: last.y };
+        } else {
+          currentPos = null;
+        }
+
+        historyStack = [];
+        redraw();
+        alert("TXT 불러오기 성공! 글자 개수: " + placedChars.length + "개");
+      } catch (err) {
+        console.error(err);
+        alert("TXT 파일을 읽는 중 오류가 발생했습니다: " + err.message);
+      }
+    };
+    reader.readAsText(file, "utf-8");
+    // 같은 파일을 다시 선택해도 change가 발생하도록 값 초기화
+    loadTxtInput.value = "";
+  });
+
+
+  // -------------------------
+  // 9. JSON 불러오기 + 복원
+  // -------------------------
+  loadInput.addEventListener("change", () => {
+    const file = loadInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const data = JSON.parse(text);
+
+        if (!data || !Array.isArray(data.placedChars)) {
+          alert("올바르지 않은 JSON 형식입니다.");
+          return;
+        }
+
+        placedChars = data.placedChars.map(c => ({
+          char: c.char,
+          x: c.x,
+          y: c.y,
+          size: (typeof c.size === "number") ? c.size : 50
+        }));
+        currentPos = data.currentPos || null;
+        historyStack = [];
+
+        redraw();
+        alert("JSON 불러오기 성공! 글자 개수: " + placedChars.length + "개");
+      } catch (err) {
+        console.error(err);
+        alert("JSON 파일을 읽는 중 오류가 발생했습니다: " + err.message);
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  });
+
+  // 최초 상태 표시
+  updateStatus();
+  
+  
+/* === Simplified → Traditional Chinese (very small OpenCC-like map) === */
+/* 실사용에서 자주 나오는 글자 위주 (확장 가능) */
+const S2T_MAP = {
+  "汉":"漢","语":"語","马":"馬","门":"門","国":"國","东":"東","风":"風",
+  "云":"雲","书":"書","车":"車","后":"後","发":"發","台":"臺","万":"萬",
+  "与":"與","专":"專","业":"業","中":"中","国":"國","网":"網",
+  "简":"簡","体":"體","电":"電","话":"話","画":"畫","见":"見",
+  "听":"聽","爱":"愛","学":"學","习":"習","这":"這","里":"裡"
+};
+
+function simplifiedToTraditional(text) {
+  return text.split("").map(ch => S2T_MAP[ch] || ch).join("");
+}
+</script>
+
+
+<!-- === Multilingual Voice Input Panel === -->
+<div id="voicePanel" style="position:fixed;right:16px;bottom:16px;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:14px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-family:system-ui;;min-width:280px">
+  <div style="font-weight:700;margin-bottom:6px;">🎙 음성 입력</div>
+  <select id="voiceLang" style="width:100%;margin-bottom:6px;">
+    <option value="ko-KR">한국어 (ko-KR)</option>
+<option value="ja-JP">日本語 (ja-JP)</option>
+<option value="en-US">English (en-US)</option>
+<option value="zh-CN">中文(简体) (zh-CN)</option>
+<option value="zh-TW">中文(繁體) (zh-TW)</option>
+<option value="es-ES">Español (es-ES)</option>
+<option value="ru-RU">Русский (ru-RU)</option>
+<option value="mn-MN">Монгол (mn-MN)</option>
+<option value="id-ID">Bahasa Indonesia (id-ID)</option>
+<option value="vi-VN">Tiếng Việt (vi-VN)</option>
+<option value="hi-IN">हिन्दी (hi-IN)</option>
+<option value="ne-NP">नेपाली (ne-NP)</option>
+<option value="gu-IN">ગુજરાતી (gu-IN)</option>
+<option value="ar-SA">العربية (ar-SA)</option>
+<option value="he-IL">עברית (he-IL)</option>
+
+<option value="fa-IR">فارسی (fa-IR)</option>
+<option value="am-ET">አማርኛ (am-ET)</option>
+<option value="chr-US">ᏣᎳᎩ (chr-US)</option>
+<option value="ceb-PH">Binisaya/Cebuano (ceb-PH)</option>
+<option value="ff-Adlm-SN" data-keyboard-only="1" data-note="adlam">𞤆𞤵𞤤𞤢𞥄𞤪 Adlam/Fulfulde (키보드 전용)</option>
+<option value="tl-Tglg-PH" data-keyboard-only="1" data-note="baybayin">ᜊᜌ᜔ᜊᜌᜒᜈ᜔ Baybayin (키보드 전용)</option>
+
+<option value="th-TH">ไทย (Thai) (th-TH)</option>
+<option value="km-KH">ខ្មែរ (Khmer) (km-KH)</option>
+<option value="my-MM">မြန်မာ (Myanmar) (my-MM)</option>
+<option value="lo-LA">ລາວ (Lao) (lo-LA)</option>
+    <option value="bo-IN" data-keyboard-only="1" data-note="tibetan">བོད་སྐད། Tibetan (bo-IN)</option>
+  <option value="manchu" data-keyboard-only="1" data-note="manchu">ᠮᠠᠨᠵᡠ Manchu (키보드 전용)</option>
+</select>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <button id="vStart">시작</button>
+    <button id="vStop" disabled>중지</button>
+    <button id="vSpeak" title="마지막 입력(또는 선택 언어 예문)을 읽습니다.">🔊 읽기</button>
+  </div>
+  <div style="margin-top:6px;font-size:11px;color:#666;line-height:1.35;">
+    </div>
+  <div id="vStatus" style="margin-top:6px;font-size:12px;color:#444;">대기</div>
+</div>
+
+<script>
+(function() {
+  
+  // =========================
+  // TTS (Text-to-Speech) helper
+  // =========================
+  const WRAP_X = 900;   // STT 자동 줄바꿈 기준 x
+const LINE_GAP = 1.4; // 줄 간격 배수
+  
+  function speakText(text, lang) {
+    try {
+      if (!("speechSynthesis" in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang || "en-US";
+      const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+      const v = voices.find(v => v.lang === u.lang) || voices.find(v => (v.lang || "").startsWith((u.lang || "").split("-")[0]));
+      if (v) u.voice = v;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) {
+      console.warn("TTS failed:", e);
+    }
+  }
+
+  function snap5(n) { return Math.round(n / 5) * 5; }
+
+  // Thai demo phrase → romanization + Hangul transcription (handcrafted for demo)
+  const THAI_DEMO = "บรรทัดฐานภาษาไทย เล่ม 1";
+  const THAI_DEMO_ROMA = "banthatthan phasa thai lem 1";
+  const THAI_DEMO_HANGUL = "반낫탄 파싸 타이 렘 느엉";
+
+  function insertMultilineAt(startX, startY, lines) {
+    if (!currentPos) currentPos = { x: startX, y: startY };
+    const oldSize = currentFontSize;
+
+    for (let i = 0; i < lines.length; i++) {
+      const L = lines[i];
+      if (typeof L.size === "number") currentFontSize = L.size;
+
+      currentPos = { x: startX, y: snap5(startY + i * (oldSize * 1.4)) };
+      insertTextToCanvas(L.text);
+    }
+
+    currentFontSize = oldSize;
+  }
+
+  function handleThaiWithTranslit(text) {
+    if (!currentPos) return;
+    const startX = currentPos.x;
+    const startY = currentPos.y;
+
+    insertMultilineAt(startX, startY, [
+      { text: text, size: currentFontSize },
+      { text: THAI_DEMO_ROMA, size: 25 },
+      { text: THAI_DEMO_HANGUL, size: 25 }
+    ]);
+
+    // Speak original Thai
+    speakText(text, "th-TH");
+  }
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById("vStatus").textContent = "브라우저 미지원";
+    return;
+  }
+
+  const recog = new SpeechRecognition();
+  recog.continuous = true;
+  recog.interimResults = false;
+
+  const langSel = document.getElementById("voiceLang");
+  const startBtn = document.getElementById("vStart");
+  const stopBtn = document.getElementById("vStop");
+  const statusEl = document.getElementById("vStatus");
+
+  
+  // -------------------------
+  // Keyboard-only languages (no STT/TTS) notice
+  // -------------------------
+  function selectedOption() {
+    return langSel.options[langSel.selectedIndex];
+  }
+
+  function isKeyboardOnlySelected() {
+    const opt = selectedOption();
+    return !!(opt && opt.dataset && opt.dataset.keyboardOnly === "1");
+  }
+
+  function keyboardOnlyMessage() {
+    const opt = selectedOption();
+    const note = opt && opt.dataset ? opt.dataset.note : "";
+    if (note === "manchu") return "만주어(ᠮᠠᠨᠵᡠ)는 키보드 입력으로 사용 가능합니다. (음성 인식/읽기 미지원)";
+    if (note === "tibetan") return "티베트어(བོད་སྐད།)는 키보드 입력으로 사용 가능합니다. (음성 인식/읽기 미지원)";
+    if (note === "adlam") return `풀라어(아들람 문자)는 키보드 입력/붙여넣기로 사용 가능합니다. (음성 인식/읽기 미지원)
+
+※ 글자가 □□□로 보이면 'Noto Sans Adlam' 같은 폰트를 설치하세요.`;
+    if (note === "baybayin") return `바이바이인(Baybayin) 문자는 키보드 입력/붙여넣기로 사용 가능합니다. (음성 인식/읽기 미지원)
+
+※ 글자가 □□□로 보이면 'Noto Sans Tagalog' 같은 폰트를 설치하세요.`;
+    return "키보드 입력 전용(음성 미지원) 언어입니다.";
+  }
+
+  function applyKeyboardOnlyUI() {
+    if (isKeyboardOnlySelected()) {
+      alert(keyboardOnlyMessage());
+      statusEl.textContent = "키보드 입력 전용(음성 인식 미지원)";
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+    } else {
+      startBtn.disabled = false;
+      // stop 버튼은 인식 중에만 활성화되도록 기존 로직에 맡김
+      if ((statusEl.textContent || "").includes("키보드 입력 전용")) statusEl.textContent = "대기";
+    }
+  }
+
+  langSel.addEventListener("change", applyKeyboardOnlyUI);
+  setTimeout(applyKeyboardOnlyUI, 0);
+// TTS 음성 목록이 늦게 로딩되는 브라우저(특히 Chrome) 대응
+  if ("speechSynthesis" in window) {
+    speechSynthesis.onvoiceschanged = () => {};
+  }
+
+
+  function setStatus(t) { statusEl.textContent = t; }
+
+  recog.onstart = () => {
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    setStatus("듣는 중 (" + recog.lang + ")");
+  };
+  recog.onend = () => {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setStatus("대기");
+  };
+  recog.onerror = (e) => {
+    setStatus("오류: " + e.error);
+  };
+  recog.onresult = (e) => {
+  let t = e.results[e.results.length - 1][0].transcript;
+
+  // 🔴 zh-TW일 때만 간체 → 번체 변환
+  if (langSel.value === "zh-TW") {
+    t = simplifiedToTraditional(t);
+  }
+
+  window.__lastVoiceText = t;
+
+  insertTextToCanvas(t);
+};
+
+  async function start() {
+    if (typeof isKeyboardOnlySelected === "function" && isKeyboardOnlySelected()) { alert(keyboardOnlyMessage()); return; }
+if (!window.isSecureContext) {
+      alert("localhost/HTTPS에서 실행하세요.");
+      return;
+    }
+    recog.lang = langSel.value;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({audio:true});
+      s.getTracks().forEach(t=>t.stop());
+      recog.start();
+    } catch(e) {
+      alert("마이크 권한 필요");
+    }
+  }
+
+  startBtn.onclick = start;
+  stopBtn.onclick = ()=>recog.stop();
+
+  // 🔊 Speak last text (or a short sample in selected language)
+  const speakBtn = document.getElementById("vSpeak");
+  speakBtn.onclick = () => {
+    const lang = langSel.value;
+    const last = (window.__lastVoiceText || "").trim();
+    const sample = {
+      "ko-KR": "안녕하세요",
+      "en-US": "Hello",
+      "ar-SA": "السلام عليكم",
+      "hi-IN": "नमस्ते",
+      "th-TH": "สวัสดี",
+      "km-KH": "សួស្តី",
+      "lo-LA": "ສະບາຍດີ",
+      "my-MM": "မင်္ဂလာပါ",
+      "ne-NP": "नमस्ते",
+	  "ja-JP": "こんにちは",
+      "zh-CN": "你好",
+      "mn-MN": "Сайн байна уу",
+	  "he-IL": "שלום"
+    };
+
+    const text = last || sample[lang] || sample["en-US"];
+
+    // ✅ TTS 지원/음성 유무 안내
+    if (!("speechSynthesis" in window)) {
+      alert("이 브라우저는 TTS(읽기)를 지원하지 않습니다. Chrome/Edge를 권장합니다.");
+      return;
+    }
+    const voices = speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) {
+      alert("TTS 음성 목록을 아직 불러오는 중입니다. 1~2초 뒤에 다시 눌러 주세요.");
+      return;
+    }
+    const hasVoice = voices.some(v => v.lang === lang || (v.lang || "").startsWith(lang.split("-")[0]));
+    if (!hasVoice) {
+      alert("이 PC/브라우저에는 선택한 언어의 TTS 음성이 없어서 소리가 나지 않습니다.\n\n- 해결: Windows(또는 OS)에서 해당 언어의 음성(TTS)을 설치하거나,\n- 다른 브라우저/PC에서 실행해 보세요.");
+      return;
+    }
+
+    speakText(text, lang);
+  };
+})();
+</script>
+
+</body>
+</html>
